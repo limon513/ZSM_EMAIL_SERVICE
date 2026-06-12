@@ -53,6 +53,7 @@ app.post("/send-email", async (req, res) => {
     port: Number(SMTP_PORT) || 465,
     secure: true,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    family: 4,
   });
 
   const html = `
