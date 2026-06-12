@@ -48,10 +48,12 @@ app.post("/send-email", async (req, res) => {
     return res.status(500).json({ error: "Email service not configured" });
   }
 
+  const port = Number(SMTP_PORT) || 587;
   const transporter = nodemailer.createTransport({
     host: SMTP_HOST,
-    port: Number(SMTP_PORT) || 465,
-    secure: true,
+    port,
+    secure: port === 465,
+    requireTLS: port === 587,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
     family: 4,
   });
