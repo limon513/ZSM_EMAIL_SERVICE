@@ -1,3 +1,6 @@
+const dns = require("dns");
+dns.setDefaultResultOrder("ipv4first");
+
 const express = require("express");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
@@ -55,7 +58,6 @@ app.post("/send-email", async (req, res) => {
     secure: port === 465,
     requireTLS: port === 587,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
-    family: 4,
   });
 
   const html = `
