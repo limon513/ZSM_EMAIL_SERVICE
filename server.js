@@ -1,8 +1,5 @@
-const dns = require("dns");
-dns.setDefaultResultOrder("ipv4first");
-
 const express = require("express");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const cors = require("cors");
 
 const app = express();
@@ -16,7 +13,6 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
 app.use(
   cors({
     origin: (origin, cb) => {
-      // Allow requests with no origin (e.g. server-to-server) or listed origins
       if (!origin || ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)) {
         cb(null, true);
       } else {
@@ -43,22 +39,15 @@ app.post("/send-email", async (req, res) => {
     return res.status(400).json({ error: "Name and phone are required" });
   }
 
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_TO } = process.env;
-  const recipient = mailTo || MAIL_TO || SMTP_USER;
+  const { RESEND_API_KEY, RESEND_FROM, MAIL_TO } = process.env;
+  const recipient = mailTo || MAIL_TO;
 
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-    console.error("[email-service] SMTP env vars missing");
+  if (!RESEND_API_KEY || !recipient) {
+    console.error("[email-service] RESEND_API_KEY or recipient missing");
     return res.status(500).json({ error: "Email service not configured" });
   }
 
-  const port = Number(SMTP_PORT) || 587;
-  const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port,
-    secure: port === 465,
-    requireTLS: port === 587,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-  });
+  const resend = new Resend(RESEND_API_KEY);
 
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
@@ -79,8 +68,8 @@ app.post("/send-email", async (req, res) => {
     </div>`;
 
   try {
-    await transporter.sendMail({
-      from: `"ZSM Transport Agency Website" <${SMTP_USER}>`,
+    const { error } = await resend.emails.send({
+      from: RESEND_FROM || "ZSM Transport Agency <onboarding@resend.dev>",
       to: recipient,
       replyTo: email || undefined,
       subject: `New Delivery Request from ${name}`,
@@ -88,10 +77,15 @@ app.post("/send-email", async (req, res) => {
       html,
     });
 
+    if (error) {
+      console.error("[email-service] Resend error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
     console.log(`[email-service] Email sent for: ${name}`);
     return res.status(200).json({ ok: true });
   } catch (err) {
-    console.error("[email-service] sendMail error:", err.message);
+    console.error("[email-service] send error:", err.message);
     return res.status(500).json({ error: err.message });
   }
 });
